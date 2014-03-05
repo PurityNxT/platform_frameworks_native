@@ -46,6 +46,9 @@ public:
     enum { NO_CONNECTED_API = 0 };
     enum { INVALID_BUFFER_SLOT = -1 };
     enum { STALE_BUFFER_SLOT = 1, NO_BUFFER_AVAILABLE, PRESENT_LATER };
+#ifdef STE_HARDWARE
+    enum { NUM_BLIT_BUFFER_SLOTS = 2 };
+#endif
 
     // When in async mode we reserve two slots in order to guarantee that the
     // producer and consumer can run asynchronously.
@@ -207,10 +210,17 @@ public:
     // connected to the specified producer API.
     virtual status_t disconnect(int api);
 
+    // setBufferSize enables us to specify user defined sizes for the buffers
+    // that need to be allocated by surfaceflinger for its client. This is
+    // useful for cases where the client doesn't want the gralloc to calculate
+    // buffer size. client should reset this value to 0, if it wants gralloc
+    // to calculate the size for the buffer. this will take effect from next
+    // dequeue buffer.
+    virtual status_t setBuffersSize(int size);
+
     /*
      * IGraphicBufferConsumer interface
      */
-
     // acquireBuffer attempts to acquire ownership of the next pending buffer in
     // the BufferQueue.  If no buffer is pending then it returns -EINVAL.  If a
     // buffer is successfully acquired, the information about the buffer is
