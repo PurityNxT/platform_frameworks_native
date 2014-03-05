@@ -38,10 +38,18 @@ class GraphicBufferMapper;
 // ===========================================================================
 
 class GraphicBuffer
-    : public ANativeObjectBase< ANativeWindowBuffer, GraphicBuffer, RefBase >,
+    : public ANativeObjectBase< ANativeWindowBuffer, GraphicBuffer,
+#ifdef STE_HARDWARE
+    LightRefBase<GraphicBuffer> >,
+      public Flattenable
+#else
+    RefBase >,
       public Flattenable<GraphicBuffer>
+#endif
 {
+#ifndef STE_HARDWARE
     friend class Flattenable<GraphicBuffer>;
+#endif
 public:
 
     enum {
@@ -49,7 +57,7 @@ public:
         USAGE_SW_READ_RARELY    = GRALLOC_USAGE_SW_READ_RARELY,
         USAGE_SW_READ_OFTEN     = GRALLOC_USAGE_SW_READ_OFTEN,
         USAGE_SW_READ_MASK      = GRALLOC_USAGE_SW_READ_MASK,
-        
+
         USAGE_SW_WRITE_NEVER    = GRALLOC_USAGE_SW_WRITE_NEVER,
         USAGE_SW_WRITE_RARELY   = GRALLOC_USAGE_SW_WRITE_RARELY,
         USAGE_SW_WRITE_OFTEN    = GRALLOC_USAGE_SW_WRITE_OFTEN,
@@ -64,10 +72,17 @@ public:
         USAGE_HW_2D             = GRALLOC_USAGE_HW_2D,
         USAGE_HW_COMPOSER       = GRALLOC_USAGE_HW_COMPOSER,
         USAGE_HW_VIDEO_ENCODER  = GRALLOC_USAGE_HW_VIDEO_ENCODER,
-        USAGE_HW_MASK           = GRALLOC_USAGE_HW_MASK
+        USAGE_HW_MASK           = GRALLOC_USAGE_HW_MASK,
+#ifdef EXYNOS4_ENHANCEMENTS
+        USAGE_HW_FIMC1          = GRALLOC_USAGE_HW_FIMC1
+#endif
     };
 
     GraphicBuffer();
+
+    // creates buffer of bufferSize
+    GraphicBuffer(uint32_t w, uint32_t h,
+                  PixelFormat format, uint32_t usage, uint32_t bufferSize);
 
     // creates w * h buffer
     GraphicBuffer(uint32_t w, uint32_t h, PixelFormat format, uint32_t usage);
@@ -88,7 +103,7 @@ public:
     uint32_t getUsage() const           { return usage; }
     PixelFormat getPixelFormat() const  { return format; }
     Rect getBounds() const              { return Rect(width, height); }
-    
+
     status_t reallocate(uint32_t w, uint32_t h, PixelFormat f, uint32_t usage);
 
     status_t lock(uint32_t usage, void** vaddr);
@@ -135,8 +150,10 @@ private:
     GraphicBuffer& operator = (const GraphicBuffer& rhs);
     const GraphicBuffer& operator = (const GraphicBuffer& rhs) const;
 
-    status_t initSize(uint32_t w, uint32_t h, PixelFormat format, 
+    status_t initSize(uint32_t w, uint32_t h, PixelFormat format,
             uint32_t usage);
+    status_t initSize(uint32_t w, uint32_t h, PixelFormat format,
+            uint32_t usage, uint32_t bufferSize);
 
     void free_handle();
 
@@ -151,3 +168,4 @@ private:
 }; // namespace android
 
 #endif // ANDROID_GRAPHIC_BUFFER_H
+
