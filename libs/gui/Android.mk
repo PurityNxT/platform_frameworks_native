@@ -39,6 +39,28 @@ LOCAL_SHARED_LIBRARIES := \
 	libutils \
 	liblog
 
+#ifdef STE_HARDWARE
+LOCAL_SHARED_LIBRARIES += \
+       libhardware \
+       libhardware_legacy
+#endif
+
+# Executed only on QCOM BSPs
+ifeq ($(TARGET_USES_QCOM_BSP),true)
+ifneq ($(TARGET_QCOM_DISPLAY_VARIANT),)
+    LOCAL_C_INCLUDES += hardware/qcom/display-$(TARGET_QCOM_DISPLAY_VARIANT)/libgralloc
+else
+    LOCAL_C_INCLUDES += hardware/qcom/display/$(TARGET_BOARD_PLATFORM)/libgralloc
+endif
+    LOCAL_CFLAGS += -DQCOM_BSP
+endif
+
+ifeq ($(BOARD_EGL_NEEDS_LEGACY_FB),true)
+    LOCAL_CFLAGS += -DBOARD_EGL_NEEDS_LEGACY_FB
+    ifneq ($(TARGET_BOARD_PLATFORM),exynos4)
+        LOCAL_CFLAGS += -DSURFACE_SKIP_FIRST_DEQUEUE
+    endif
+endif
 
 LOCAL_MODULE:= libgui
 
@@ -47,6 +69,9 @@ ifeq ($(TARGET_BOARD_PLATFORM), tegra)
 endif
 ifeq ($(TARGET_BOARD_PLATFORM), tegra3)
 	LOCAL_CFLAGS += -DDONT_USE_FENCE_SYNC
+endif
+ifeq ($(TARGET_TOROPLUS_RADIO), true)
+	LOCAL_CFLAGS += -DTOROPLUS_RADIO
 endif
 
 include $(BUILD_SHARED_LIBRARY)
