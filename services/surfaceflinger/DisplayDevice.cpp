@@ -29,6 +29,18 @@
 
 #include <gui/Surface.h>
 
+#ifdef EGL_NEEDS_FNW
+#include <ui/FramebufferNativeWindow.h>
+#endif
+
+#include <GLES/gl.h>
+#include <EGL/egl.h>
+#include <EGL/eglext.h>
+
+#ifdef BOARD_EGL_NEEDS_LEGACY_FB
+#include <ui/FramebufferNativeWindow.h>
+#endif
+
 #include <hardware/gralloc.h>
 
 #include "DisplayHardware/DisplaySurface.h"
@@ -71,10 +83,15 @@ DisplayDevice::DisplayDevice(
       mSecureLayerVisible(false),
       mScreenAcquired(false),
       mLayerStack(NO_LAYER_STACK),
+      mHardwareOrientation(0),
       mOrientation()
 {
-    mNativeWindow = new Surface(producer, false);
-    ANativeWindow* const window = mNativeWindow.get();
+#ifdef STE_HARDWARE
+      ANativeWindow* const window = new FramebufferNativeWindow();
+#else
+      mNativeWindow = new Surface(producer, false);
+      ANativeWindow* const window = mNativeWindow.get();
+#endif
 
     int format;
     window->query(window, NATIVE_WINDOW_FORMAT, &format);
@@ -114,7 +131,12 @@ DisplayDevice::DisplayDevice(
     // was created with createDisplay().
     switch (mType) {
         case DISPLAY_PRIMARY:
+            char value[PROPERTY_VALUE_MAX];
             mDisplayName = "Built-in Screen";
+
+            /* hwrotation applies only to the primary display */
+            property_get("ro.sf.hwrotation", value, "0");
+            mHardwareOrientation = atoi(value);
             break;
         case DISPLAY_EXTERNAL:
             mDisplayName = "HDMI Screen";
@@ -367,6 +389,18 @@ status_t DisplayDevice::orientationToTransfrom(
         int orientation, int w, int h, Transform* tr)
 {
     uint32_t flags = 0;
+    int additionalRot = this->getHardwareOrientation();
+
+    if (additionalRot) {
+        additionalRot /= 90;
+        if (orientation == DisplayState::eOrientationUnchanged) {
+            orientation = additionalRot;
+        } else {
+            orientation += additionalRot;
+            orientation %= 4;
+        }
+    }
+
     switch (orientation) {
     case DisplayState::eOrientationDefault:
         flags = Transform::ROT_0;
@@ -383,6 +417,7 @@ status_t DisplayDevice::orientationToTransfrom(
     default:
         return BAD_VALUE;
     }
+
     tr->set(flags, w, h);
     return NO_ERROR;
 }
@@ -401,7 +436,11 @@ void DisplayDevice::setProjection(int orientation,
     if (!frame.isValid()) {
         // the destination frame can be invalid if it has never been set,
         // in that case we assume the whole display frame.
-        frame = Rect(w, h);
+        if ((mHardwareOrientation/90) & DisplayState::eOrientationSwapMask) {
+            frame = Rect(h, w);
+        } else {
+            frame = Rect(w, h);
+        }
     }
 
     if (viewport.isEmpty()) {
@@ -456,16 +495,27 @@ void DisplayDevice::setProjection(int orientation,
     mFrame = frame;
 }
 
+int DisplayDevice::getHardwareOrientation() {
+    return mHardwareOrientation;
+}
+
 void DisplayDevice::dump(String8& result) const {
     const Transform& tr(mGlobalTransform);
     result.appendFormat(
         "+ DisplayDevice: %s\n"
-        "   type=%x, hwcId=%d, layerStack=%u, (%4dx%4d), ANativeWindow=%p, orient=%2d (type=%08x), "
+        "   type=%x, hwcId=%d, layerStack=%u, (%4dx%4d), "
+#ifndef STE_HARDWARE
+        "ANativeWindow=%p, "
+#endif
+        "orient=%2d (type=%08x), "
         "flips=%u, isSecure=%d, secureVis=%d, acquired=%d, numLayers=%u\n"
         "   v:[%d,%d,%d,%d], f:[%d,%d,%d,%d], s:[%d,%d,%d,%d],"
         "transform:[[%0.3f,%0.3f,%0.3f][%0.3f,%0.3f,%0.3f][%0.3f,%0.3f,%0.3f]]\n",
         mDisplayName.string(), mType, mHwcDisplayId,
-        mLayerStack, mDisplayWidth, mDisplayHeight, mNativeWindow.get(),
+        mLayerStack, mDisplayWidth, mDisplayHeight,
+#ifndef STE_HARDWARE
+        mNativeWindow.get(),
+#endif
         mOrientation, tr.getType(), getPageFlipCount(),
         mIsSecure, mSecureLayerVisible, mScreenAcquired, mVisibleLayersSortedByZ.size(),
         mViewport.left, mViewport.top, mViewport.right, mViewport.bottom,
