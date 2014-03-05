@@ -105,8 +105,12 @@ public:
     // and height of the window and current transform applied to buffers,
     // respectively.
 
+#ifdef STE_HARDWARE
+    struct QueueBufferInput : public Flattenable {
+#else
     struct QueueBufferInput : public Flattenable<QueueBufferInput> {
         friend class Flattenable<QueueBufferInput>;
+#endif
         inline QueueBufferInput(const Parcel& parcel);
         inline QueueBufferInput(int64_t timestamp, bool isAutoTimestamp,
                 const Rect& crop, int scalingMode, uint32_t transform, bool async,
@@ -204,6 +208,15 @@ public:
     // This method will fail if the the IGraphicBufferProducer is not currently
     // connected to the specified client API.
     virtual status_t disconnect(int api) = 0;
+
+    // setBufferSize enables to specify the user defined size of the buffer
+    // that needs to be allocated by surfaceflinger for its client. This is
+    // useful for cases where the client doesn't want the gralloc to calculate
+    // buffer size. client should reset this value to 0, if it wants gralloc to
+    // calculate the size for the buffer. this will take effect from next
+    // dequeue buffer.
+    virtual status_t setBuffersSize(int size) = 0;
+
 };
 
 // ----------------------------------------------------------------------------
@@ -221,3 +234,4 @@ public:
 }; // namespace android
 
 #endif // ANDROID_GUI_IGRAPHICBUFFERPRODUCER_H
+
